@@ -1,0 +1,16 @@
+networks:
+  - id: A
+    network: '10.0.0.0/24'
+    gateway: internet
+    num_of_clients: 3
+    num_of_interfaces: 4
+  - id: B
+    network: '172.16.0.0/24'
+    gateway: A
+    num_of_clients: 3
+    num_of_interfaces: 4
+  - id: C
+    network: '192.168.0.0/24'
+    gateway: B
+    num_of_clients: 3
+    num_of_interfaces: 4

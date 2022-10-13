@@ -2,3 +2,4 @@ fastapi
 aiofiles
 elasticsearch[async]
 pydantic[dotenv]
+pyyaml

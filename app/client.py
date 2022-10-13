@@ -2,10 +2,12 @@ import asyncio
 import socket
 import random
 import ipaddress
+import yaml
+import requests
 from elasticsearch import AsyncElasticsearch
 from elasticsearch import ConnectionError
 from .config import settings
-from .flow_record import FlowRecord
+from .model import NetworkRequest
 
 
 if settings.es_cloud_id:
@@ -21,6 +23,11 @@ for external_host in external_hosts.read().splitlines():
   external_ip = socket.gethostbyname(external_host)
   print(external_host + '=' + external_ip)
   external_ips.append(external_ip)
+
+with open('topology.yml', 'r') as file:
+  topology = yaml.safe_load(file)
+
+print(topology)
 
 # https://stackoverflow.com/questions/37512182/how-can-i-periodically-execute-a-function-with-asyncio
 async def repeat(interval, func, *args, **kwargs):
@@ -38,38 +45,40 @@ async def repeat(interval, func, *args, **kwargs):
         )
 
 
-ds_type = 'logs'
-ds_data_set = 'netflow.log'
-ds_namespace = 'test'
-ds = '{}-{}-{}'.format(ds_type, ds_data_set, ds_namespace)
-
-local_host_name = 'A'
-local_network = '192.168.0.0/24'
-local_network_address = ipaddress.ip_network(local_network)
-
-num_of_client = 3
-num_of_interfaces = 4
-
 tasks = []
-clients = [{'ip': ipaddress.ip_address(int(local_network_address.network_address) + i)} for i in range(num_of_client)]
+clients = []
+
+for network in topology['networks']:
+  local_network = network['network']
+  local_network_address = ipaddress.ip_network(local_network)
+
+  clients.extend([{
+    'network_id': network['id'],
+    'ip': ipaddress.ip_address(int(local_network_address.network_address) + i),
+    'gateway': network['gateway']
+  } for i in range(network['num_of_clients'])])
 
 async def executeClient(client):
   print(client)
-  destination_ip = external_ips[random.randrange(0, len(external_ips))]
-  record = FlowRecord(host_name=local_host_name,
-    ingress_interface=random.randrange(0, num_of_interfaces),
-    egress_interface=random.randrange(0, num_of_interfaces),
-    client_bytes=random.randrange(200, 4096), client_ip=str(client['ip']), client_port=random.randrange(49152, 65536),
-    destination_bytes=random.randrange(1024, 10240), destination_ip=destination_ip, destination_port=443)
-  doc = record.toEcs()
-  doc['data_stream'] = {'type': ds_type, 'dataset': ds_data_set, 'namespace': ds_namespace}
+  target_network = random.randrange(-1, len(topology['networks']))
+  if target_network < 0:
+    # external traffic
+    destination_ip = external_ips[random.randrange(0, len(external_ips))]
+  else:
+    # local traffic
+    destination_network = topology['networks'][target_network]['network']
+    destination_network_address = ipaddress.ip_network(destination_network)
+    num_of_local_ips = int(destination_network_address.hostmask)
+    destination_ip = str(ipaddress.ip_address(int(destination_network_address.network_address)
+                                                + random.randrange(1, num_of_local_ips)))
 
-  try:
-      res = await es.index(index=ds, document=doc)
-      print(res)
-  except (ConnectionError) as e:
-      print('Elasticsearch data ingestion failed.')
-      print(e)
+  request = NetworkRequest(source_ip=str(client['ip']), source_port=random.randrange(49152, 65536),
+                            destination_ip=destination_ip, destination_port=443)
+
+  print(request)
+  res = requests.post('http://localhost:8000/' + client['network_id'] + '/send/', json=request.dict())
+  print(res)
+
 
 
 

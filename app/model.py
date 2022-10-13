@@ -1,32 +1,27 @@
+from pydantic import BaseModel
 from datetime import datetime
 import math
 
-class FlowRecord():
 
-  def __init__(self,
-  host_name:str,
-  ingress_interface:int,
-  egress_interface:int,
-  source_bytes:int,
-  source_ip:str,
-  source_port:int,
-  source_locality:str,
-  destination_bytes:int,
-  destination_ip:str,
-  destination_port:int,
-  destination_locality:str
-) -> None:
-    self.host_name = host_name
-    self.ingress_interface = ingress_interface
-    self.egress_interface = egress_interface
-    self.source_bytes = source_bytes
-    self.source_ip = source_ip
-    self.source_port = source_port
-    self.source_locality = source_locality
-    self.destination_bytes = destination_bytes
-    self.destination_ip = destination_ip
-    self.destination_port = destination_port
-    self.destination_locality = destination_locality
+class NetworkRequest(BaseModel):
+  source_ip: str
+  source_port: int
+  destination_ip: str
+  destination_port: int
+
+
+class FlowRecord(BaseModel):
+  host_name: str
+  ingress_interface: int
+  egress_interface: int
+  source_bytes: int
+  source_ip: str
+  source_port: int
+  source_locality: str
+  destination_bytes: int
+  destination_ip: str
+  destination_port: int
+  destination_locality: str
 
   def toEcs(self):
     now = datetime.utcnow().isoformat()
