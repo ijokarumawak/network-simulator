@@ -1,0 +1,44 @@
+fields:
+  "@timestamp": "2022-10-12T17:03:00+09:00"
+  agent:
+    id: "container_id"
+    name: "container_name"
+  client:
+    bytes: 12345
+    ip: 192.168.10.123
+    packets: 12
+    port: 34256
+  data_stream:
+    type: ""
+    dataset: ""
+    namespace: ""
+  destination:
+    bytes: 0
+    ip: 53.123.4.5
+    packets: 0
+    port: 443
+  ecs:
+    version: "8.4.0"
+  event:
+    action: netflow_flow
+    category:
+      - network
+      - session
+    created: "2022-10-12T17:03:00+09:00"
+    kind: event
+    type: connection
+  flow:
+    # Which hash algorithm to use?
+    id: "123"
+    locality: internal
+  # Which host is it? Probably where the agent is running on.
+  host:
+    hostname: "container_name"
+    name: "container_name"
+  input:
+    type: netflow
+  # There are lots of fields under netflow, but not much descriptions written.
+  netflow:
+    interface_name: "eth0"
+  # Let's ignore network fields for now.
+  network:
