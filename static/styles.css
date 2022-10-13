@@ -1,3 +1,55 @@
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
 h1 {
   color: green;
 }
+
+.container {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.space-between {
+  justify-content: space-between;
+}
+
+#messages {
+  max-height: 150px;
+  overflow: auto;
+}
+
+#messages td {
+  padding: 5px;
+}
+
+.interface {
+  min-width: 200px;
+  margin: 10px;
+  padding: 10px;
+}
+
+.interface h3 {
+  margin: 0px;
+}
+
+.interface .status {
+  color: white;
+}
+
+.interface .status .up {
+  color: inherit;
+  background-color: green;
+}
+
+.interface .status .down {
+  color: inherit;
+  background-color: darkred;
+}
+
+.interface .detail {
+  padding: 10px;
+}
+

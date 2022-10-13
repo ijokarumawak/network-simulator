@@ -1,5 +1,6 @@
 import random
 import ipaddress
+from numpy import source
 import yaml
 import requests
 from fastapi import FastAPI, Request
@@ -10,6 +11,7 @@ from elasticsearch import AsyncElasticsearch
 from elasticsearch import ConnectionError
 from .config import settings
 from .model import NetworkRequest, FlowRecord
+from datetime import datetime
 
 
 if settings.es_cloud_id:
@@ -26,25 +28,34 @@ ds = '{}-{}-{}'.format(ds_type, ds_data_set, ds_namespace)
 
 with open('topology.yml', 'r') as file:
   topology = yaml.safe_load(file)
+  for network in topology['networks']:
+    network['messages'] = []
+    network['interfaces'] = [{'i': i, 'active': True, 'delay': 0, 'bytes_in': 0, 'bytes_out': 0} for i  in range(0, network['num_of_interfaces'])]
 
 app = FastAPI()
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
+def get_network(id):
+  return next(filter(lambda n : n['id'] == id, topology['networks']), None)
 
-@app.get("/items/{id}", response_class=HTMLResponse)
-async def read_item(request: Request, id: str):
-    return templates.TemplateResponse("item.html", {"request": request, "id": id})
+@app.get("/{network_id}/ui", response_class=HTMLResponse)
+async def show_network(request: Request, network_id: str):
+  network = get_network(network_id)
+  return templates.TemplateResponse("network.html", {"request": request, "network": network})
 
 
 @app.post('/{network_id}/send/')
 async def send(network_id: str, request: NetworkRequest):
-  network = next(filter(lambda n : n['id'] == network_id, topology['networks']), None)
+  network = get_network(network_id)
   print({'network_id': network_id, 'network': network, **request.dict()})
 
+  source_bytes = random.randrange(200, 4096)
+  destination_bytes = random.randrange(1024, 10240)
+
   if network_id == 'internet':
-    return {'success': True}
+    return {'success': True, 'source_bytes': source_bytes, 'destination_bytes': destination_bytes}
 
   local_network = ipaddress.ip_network(network['network'])
   source_locality = 'internal' if ipaddress.ip_address(request.source_ip) in local_network else 'external'
@@ -54,14 +65,26 @@ async def send(network_id: str, request: NetworkRequest):
     destination_locality = 'external'
     res = await send(network['gateway'], request)
     print(res)
+    # update bytes with the final one for consistency.
+    source_bytes = res['source_bytes']
+    destination_bytes = res['destination_bytes']
 
 
+  # Pick interfaces randamly.
   num_of_interfaces = network['num_of_interfaces']
+  ingress_interface = random.randrange(0, num_of_interfaces)
+  egress_interface = random.randrange(0, num_of_interfaces)
+
+  # Track sent data volumes.
+  network['interfaces'][ingress_interface]['bytes_in'] += source_bytes
+  network['interfaces'][egress_interface]['bytes_out'] += destination_bytes
+
+  # Generate a FlowRecord
   record = FlowRecord(host_name=network_id,
-    ingress_interface=random.randrange(0, num_of_interfaces),
-    egress_interface=random.randrange(0, num_of_interfaces),
-    source_bytes=random.randrange(200, 4096), source_ip=request.source_ip, source_port=request.source_port, source_locality=source_locality,
-    destination_bytes=random.randrange(1024, 10240), destination_ip=request.destination_ip, destination_port=request.destination_port, destination_locality=destination_locality)
+    ingress_interface=ingress_interface,
+    egress_interface=egress_interface,
+    source_bytes=source_bytes, source_ip=request.source_ip, source_port=request.source_port, source_locality=source_locality,
+    destination_bytes=destination_bytes, destination_ip=request.destination_ip, destination_port=request.destination_port, destination_locality=destination_locality)
   doc = record.toEcs()
   doc['data_stream'] = {'type': ds_type, 'dataset': ds_data_set, 'namespace': ds_namespace}
 
@@ -72,4 +95,14 @@ async def send(network_id: str, request: NetworkRequest):
       print('Elasticsearch data ingestion failed.')
       print(e)
 
+  return {'success': True, 'source_bytes': source_bytes, 'destination_bytes': destination_bytes}
+
+@app.post('/{network_id}/interfaces/{i}/toggle_status')
+async def toggle_status(network_id: str, i: int, request: Request):
+  network = get_network(network_id)
+  print({'network_id': network_id, 'network': network})
+  status = not network['interfaces'][i]['active']
+  network['interfaces'][i]['active'] = status
+  network['messages'].insert(0, {'timestamp':datetime.utcnow().isoformat(), 'message': 'Interface {} is {}.'.format(i, 'UP' if status else 'DOWN') })
   return {'success': True}
+

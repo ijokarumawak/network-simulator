@@ -1,0 +1,57 @@
+<html>
+<head>
+    <title>A</title>
+    <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
+</head>
+<body>
+    <h1>Network {{ network.id }}</h1>
+
+    <h2>Messages</h2>
+    <section id="messages">
+      <table>
+        <thead>
+          <th>timestamp</th>
+          <th>message</th>
+        </thead>
+        <tbody>
+          {% for message in network.messages %}
+          <tr><td>{{ message.timestamp }}</td><td>{{ message.message }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <h2>Interfaces</h2>
+    <div class="container">
+      {% for interface in network.interfaces %}
+      <div class="interface">
+        <div class="container space-between">
+          <h3>{{ interface.i }}</h3>
+          <div class="status" onclick="toggleInterfaceStatus('{{ network.id }}', {{ interface.i }})">
+            {% if interface.active %}
+            <button class="up">UP</button>
+            {% else %}
+            <button class="down">DOWN</button>
+            {% endif %}
+          </div>
+        </div>
+        <div class="detail">
+          <div class="container space-between">
+            <label>bytes in</label>
+            <div>{{ interface.bytes_in }}</div>
+          </div>
+          <div class="container space-between">
+            <label>bytes out</label>
+            <div>{{ interface.bytes_out }}</div>
+          </div>
+          <div class="container space-between">
+            <label>delay</label>
+            <div>{{ interface.delay }}</div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+    </div>
+    <script src="{{ url_for('static', path='/ui.js') }}"></script>
+  </body>
+</html>
