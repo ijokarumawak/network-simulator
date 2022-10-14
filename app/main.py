@@ -3,29 +3,19 @@ import random
 import ipaddress
 import yaml
 import time
+import math
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from elasticsearch import AsyncElasticsearch
 from elasticsearch import ConnectionError
-from .config import settings
+from .es import es, DataStream
 from .model import NetworkRequest, FlowRecord
 from datetime import datetime
 
 
-if settings.es_cloud_id:
-    es = AsyncElasticsearch(cloud_id=settings.es_cloud_id, api_key=settings.es_api_key)
-elif settings.es_hosts:
-    es = AsyncElasticsearch(hosts=settings.es_hosts, api_key=settings.es_api_key)
-else:
-    raise Exception('Either ES_CLOUD_ID or ES_HOSTS is required.')
-
-ds_type = 'logs'
-ds_data_set = 'netflow.log'
-ds_namespace = 'test'
-ds = '{}-{}-{}'.format(ds_type, ds_data_set, ds_namespace)
+ds = DataStream(type='logs', dataset='netflow.log')
 
 with open('topology.yml', 'r') as file:
   topology = yaml.safe_load(file)
@@ -55,6 +45,7 @@ async def send(network_id: str, request: NetworkRequest):
   # Generate some bytes randamly.
   source_bytes = random.randrange(200, 4096)
   destination_bytes = random.randrange(1024, 10240)
+  start_timestamp = datetime.utcnow()
 
   # The flow went to the internet, end of story.
   if network_id == 'internet':
@@ -97,6 +88,7 @@ async def send(network_id: str, request: NetworkRequest):
   # Track sent data volumes.
   network['interfaces'][ingress_interface]['bytes_in'] += source_bytes
   network['interfaces'][egress_interface]['bytes_out'] += destination_bytes
+  end_timestamp = datetime.utcnow()
 
   # Generate a FlowRecord
   record = FlowRecord(host_name=network_id,
@@ -105,12 +97,13 @@ async def send(network_id: str, request: NetworkRequest):
     source_bytes=source_bytes, source_ip=request.source_ip, source_port=request.source_port, source_locality=source_locality,
     destination_bytes=destination_bytes, destination_ip=request.destination_ip, destination_port=request.destination_port, destination_locality=destination_locality,
     # 3 = end of Flow detected, 4 = forced end
-    flow_end_reason= 3 if success else 4)
+    flow_end_reason= 3 if success else 4,
+    event_start=start_timestamp, event_end=end_timestamp)
   doc = record.toEcs()
-  doc['data_stream'] = {'type': ds_type, 'dataset': ds_data_set, 'namespace': ds_namespace}
+  ds.add_ds_fields(doc)
 
   try:
-      res = await es.index(index=ds, document=doc)
+      res = await es.index(index=ds.name(), document=doc)
       print(res)
   except (ConnectionError) as e:
       print('Elasticsearch data ingestion failed.')

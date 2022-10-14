@@ -1,12 +1,22 @@
 POST /_security/api_key
 {
-  "name": "network-system-emulator",
+  "name": "network-simulator",
   "role_descriptors": {
     "data-ingestion": {
       "cluster": [
         "monitor"
       ],
       "indices": [
+        {
+          "names": [
+            "logs-network_simulator.*"
+          ],
+          "privileges": [
+            "index",
+            "write",
+            "auto_configure"
+          ]
+        },
         {
           "names": [
             "logs-netflow.log-*"

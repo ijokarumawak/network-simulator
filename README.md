@@ -1,5 +1,8 @@
 # Network Simulator
 
+## .env file
+TODO: describe variables
+
 ## How to run the web app
 ```bash
 uvicorn app.main:app --reload

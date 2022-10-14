@@ -6,18 +6,14 @@ import yaml
 import requests
 import time
 import httpx
+import math
+from datetime import datetime
 from elasticsearch import AsyncElasticsearch
 from elasticsearch import ConnectionError
-from .config import settings
 from .model import NetworkRequest
+from .es import es, DataStream
 
-
-if settings.es_cloud_id:
-    es = AsyncElasticsearch(cloud_id=settings.es_cloud_id, api_key=settings.es_api_key)
-elif settings.es_hosts:
-    es = AsyncElasticsearch(hosts=settings.es_hosts, api_key=settings.es_api_key)
-else:
-    raise Exception('Either ES_CLOUD_ID or ES_HOSTS is required.')
+ds = DataStream(type='logs', dataset='network_simulator.client')
 
 external_ips = []
 external_hosts = open('external_hosts.txt', 'r')
@@ -56,6 +52,7 @@ for network in topology['networks']:
 
   clients.extend([{
     'network_id': network['id'],
+    'name': network['id'] + str(i),
     'ip': ipaddress.ip_address(int(local_network_address.network_address) + i + 1),
     'gateway': network['gateway']
   } for i in range(network['num_of_clients'])])
@@ -74,8 +71,11 @@ async def executeClient(client, http_client):
     destination_ip = str(ipaddress.ip_address(int(destination_network_address.network_address)
                                                 + random.randrange(1, num_of_local_ips)))
 
-  request = NetworkRequest(source_ip=str(client['ip']), source_port=random.randrange(49152, 65536),
-                            destination_ip=destination_ip, destination_port=443)
+  source_ip = str(client['ip'])
+  source_port = random.randrange(49152, 65536)
+  destination_port = 443
+  request = NetworkRequest(source_ip=source_ip, source_port=source_port,
+                            destination_ip=destination_ip, destination_port=destination_port)
 
   print(request)
   start = time.time()
@@ -84,17 +84,29 @@ async def executeClient(client, http_client):
   end = time.time()
   print(res)
   if res.status_code == 200:
-    # TODO: Convert to ECS and sotre it into Elasticsearch
+    # Convert to ECS and sotre it into Elasticsearch
     result = res.json()
-    result['client'] = client
-    result['duration'] = end - start
-    print(result)
+    doc = {
+      '@timestamp': datetime.utcnow().isoformat(),
+      'labels': {'network': client['network_id']},
+      'source': {'ip': source_ip, 'port': source_port, 'bytes': result['source_bytes']},
+      'destination': {'ip': destination_ip, 'port': destination_port, 'bytes': result['destination_bytes']},
+      'event': {'duration': math.ceil((end - start) * 1000), 'outcome': 'success' if result['success'] else 'failure'},
+      'host': {'name': client['name'], 'hostname': client['name'], 'ip': source_ip}
+    }
+    ds.add_ds_fields(doc)
+    print(doc)
 
-
+    try:
+        res = await es.index(index=ds.name(), document=doc)
+        print(res)
+    except (ConnectionError) as e:
+        print('Elasticsearch data ingestion failed.')
+        print(e)
 
 
 async def main():
-  async with httpx.AsyncClient() as http_client:
+  async with httpx.AsyncClient(timeout=None) as http_client:
     for client in clients:
       task = asyncio.ensure_future(repeat(10, executeClient, client, http_client))
       tasks.append(task)

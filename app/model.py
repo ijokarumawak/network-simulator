@@ -1,5 +1,6 @@
-from pydantic import BaseModel
-from datetime import datetime
+from typing import Union
+from pydantic import BaseModel, Field
+from datetime import date, datetime
 import math
 
 
@@ -22,7 +23,9 @@ class FlowRecord(BaseModel):
   destination_ip: str
   destination_port: int
   destination_locality: str
-  flow_end_reason: int = 3
+  flow_end_reason: Union[int, None] = Field(default=3)
+  event_start: datetime
+  event_end: datetime
 
   def toEcs(self):
     now = datetime.utcnow().isoformat()
@@ -52,7 +55,12 @@ class FlowRecord(BaseModel):
         'locality': self.destination_locality
       },
       'ecs': {'version': '8.4.0'},
-      'event': {'action': 'netflow_flow', 'category': ['netword', 'session']},
+      'event': {
+        'action': 'netflow_flow', 'category': ['netword', 'session'],
+        'start': self.event_start.isoformat(),
+        'end': self.event_end.isoformat(),
+        'duration': math.ceil((self.event_end.timestamp() - self.event_start.timestamp()) * 1000)
+      },
       'created': now,
       'kind': 'event',
       'type': 'connection',
