@@ -49,6 +49,8 @@ async def send(network_id: str, request: NetworkRequest):
 
   # The flow went to the internet, end of story.
   if network_id == 'internet':
+    # Add some delay.
+    await asyncio.sleep(random.randrange(200, 2000) / 1000)
     return {'success': True, 'source_bytes': source_bytes, 'destination_bytes': destination_bytes, **request.dict()}
 
   # Pick interfaces randamly.
@@ -76,7 +78,18 @@ async def send(network_id: str, request: NetworkRequest):
     if destination_locality == 'external':
       # transport
       destination_locality = 'external'
-      res = await send(network['gateway'], request)
+
+      # if no routing found, then use gateway
+      send_to = network['gateway']
+
+      # if the network has routings, check that
+      if 'routings' in network:
+        for routing in network['routings']:
+          if ipaddress.ip_address(request.destination_ip) in ipaddress.ip_network(get_network(routing)['network']):
+            send_to = routing
+            break
+
+      res = await send(send_to, request)
       print(res)
 
       # update result with the final one for consistency.

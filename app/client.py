@@ -45,13 +45,15 @@ async def repeat(interval, func, *args, **kwargs):
 
 tasks = []
 clients = []
+networks_by_id = {}
 
 for network in topology['networks']:
+  networks_by_id[network['id']] = network
   local_network = network['network']
   local_network_address = ipaddress.ip_network(local_network)
 
   clients.extend([{
-    'network_id': network['id'],
+    'network': network,
     'name': network['id'] + str(i),
     'ip': ipaddress.ip_address(int(local_network_address.network_address) + i + 1),
     'gateway': network['gateway']
@@ -59,13 +61,24 @@ for network in topology['networks']:
 
 async def executeClient(client, http_client):
   print(client)
-  target_network = random.randrange(-1, len(topology['networks']))
+  possible_targets = [client['network']['id']]
+
+  if client['network']['gateway'] != 'internet':
+    possible_targets.append(client['network']['gateway'])
+
+  if 'routings' in client['network']:
+    possible_targets.extend(client['network']['routings'])
+
+
+  print(client['network']['id'] + ' possible_targets = ' + str(possible_targets))
+
+  target_network = random.randrange(-1, len(possible_targets))
   if target_network < 0:
     # external traffic
     destination_ip = external_ips[random.randrange(0, len(external_ips))]
   else:
     # local traffic
-    destination_network = topology['networks'][target_network]['network']
+    destination_network = networks_by_id[possible_targets[target_network]]['network']
     destination_network_address = ipaddress.ip_network(destination_network)
     num_of_local_ips = int(destination_network_address.hostmask)
     destination_ip = str(ipaddress.ip_address(int(destination_network_address.network_address)
@@ -79,7 +92,7 @@ async def executeClient(client, http_client):
 
   print(request)
   start = time.time()
-  res = await http_client.post('http://localhost:8000/' + client['network_id'] + '/send/', json=request.dict())
+  res = await http_client.post('http://localhost:8000/' + client['network']['id'] + '/send/', json=request.dict())
 
   end = time.time()
   print(res)
@@ -88,7 +101,7 @@ async def executeClient(client, http_client):
     result = res.json()
     doc = {
       '@timestamp': datetime.utcnow().isoformat(),
-      'labels': {'network': client['network_id']},
+      'labels': {'network': client['network']['id']},
       'source': {'ip': source_ip, 'port': source_port, 'bytes': result['source_bytes']},
       'destination': {'ip': destination_ip, 'port': destination_port, 'bytes': result['destination_bytes']},
       'event': {'duration': math.ceil((end - start) * 1000), 'outcome': 'success' if result['success'] else 'failure'},

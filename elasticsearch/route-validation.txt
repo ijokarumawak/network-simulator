@@ -1,0 +1,63 @@
+GET logs-netflow.log-test/_search
+{
+  "size": 0,
+  "query": {
+    "bool": {
+      "filter": [
+        {
+          "range": {
+            "@timestamp": {
+              "gte": "2022-10-14T19:00:00+09:00"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "aggs": {
+    "by_source_network": {
+      "filters": {
+        "filters": {
+          "A": {
+            "match": {
+              "source.ip": "10.0.0.0/24"
+            }
+          },
+          "B": {
+            "match": {
+              "source.ip": "172.16.0.0/24"
+            }
+          },
+          "C": {
+            "match": {
+              "source.ip": "192.168.0.0/24"
+            }
+          }
+        }
+      },
+      "aggs": {
+        "by_dest_network": {
+          "filters": {
+            "filters": {
+              "A": {
+                "match": {
+                  "destination.ip": "10.0.0.0/24"
+                }
+              },
+              "B": {
+                "match": {
+                  "destination.ip": "172.16.0.0/24"
+                }
+              },
+              "C": {
+                "match": {
+                  "destination.ip": "192.168.0.0/24"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
