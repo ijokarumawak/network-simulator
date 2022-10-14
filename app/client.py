@@ -5,6 +5,7 @@ import ipaddress
 import yaml
 import requests
 import time
+import httpx
 from elasticsearch import AsyncElasticsearch
 from elasticsearch import ConnectionError
 from .config import settings
@@ -55,11 +56,11 @@ for network in topology['networks']:
 
   clients.extend([{
     'network_id': network['id'],
-    'ip': ipaddress.ip_address(int(local_network_address.network_address) + i),
+    'ip': ipaddress.ip_address(int(local_network_address.network_address) + i + 1),
     'gateway': network['gateway']
   } for i in range(network['num_of_clients'])])
 
-async def executeClient(client):
+async def executeClient(client, http_client):
   print(client)
   target_network = random.randrange(-1, len(topology['networks']))
   if target_network < 0:
@@ -78,7 +79,8 @@ async def executeClient(client):
 
   print(request)
   start = time.time()
-  res = requests.post('http://localhost:8000/' + client['network_id'] + '/send/', json=request.dict())
+  res = await http_client.post('http://localhost:8000/' + client['network_id'] + '/send/', json=request.dict())
+
   end = time.time()
   print(res)
   if res.status_code == 200:
@@ -92,11 +94,10 @@ async def executeClient(client):
 
 
 async def main():
+  async with httpx.AsyncClient() as http_client:
     for client in clients:
-
-        task = asyncio.ensure_future(
-            repeat(10, executeClient, client))
-        tasks.append(task)
+      task = asyncio.ensure_future(repeat(10, executeClient, client, http_client))
+      tasks.append(task)
 
     await asyncio.gather(*tasks)
 

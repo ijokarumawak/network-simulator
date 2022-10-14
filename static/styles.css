@@ -53,3 +53,12 @@ h1 {
   padding: 10px;
 }
 
+.interface .detail .unit {
+  font-size: small;
+  margin-left: 5px;
+}
+
+.interface .delay {
+  width: 5em;
+  text-align: right;
+}

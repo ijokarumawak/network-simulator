@@ -37,16 +37,20 @@
         </div>
         <div class="detail">
           <div class="container space-between">
-            <label>bytes in</label>
-            <div>{{ interface.bytes_in }}</div>
+            <label>in</label>
+            <div><span>{{ interface.bytes_in }}</span><span class="unit">bytes</span></div>
           </div>
           <div class="container space-between">
-            <label>bytes out</label>
-            <div>{{ interface.bytes_out }}</div>
+            <label>out</label>
+            <div><span>{{ interface.bytes_out }}</span><span class="unit">bytes</span></div>
           </div>
           <div class="container space-between">
-            <label>delay</label>
-            <div>{{ interface.delay }}</div>
+            <label for="delay-{{ interface.i }}">delay</label>
+            <div>
+              <input id="delay-{{ interface.i }}" class="delay" onkeypress="setInterfaceDelay(event)"
+                     type="number" value="{{ interface.delay }}" min="0" step="100" x-network="{{ network.id }}" x-interface="{{ interface.i }}" />
+              <span class="unit">ms</span>
+            </div>
           </div>
         </div>
       </div>

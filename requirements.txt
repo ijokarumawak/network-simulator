@@ -3,3 +3,4 @@ aiofiles
 elasticsearch[async]
 pydantic[dotenv]
 pyyaml
+httpx

@@ -1,9 +1,8 @@
+import asyncio
 import random
 import ipaddress
-from numpy import source
-from regex import F
 import yaml
-import requests
+import time
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -78,6 +77,10 @@ async def send(network_id: str, request: NetworkRequest):
     destination_bytes = 0
   
   else:
+    # Add some delay.
+    delay = network['interfaces'][ingress_interface]['delay'] + network['interfaces'][egress_interface]['delay']
+    await asyncio.sleep(delay / 1000)
+
     # If the interfaces are active, then process the request.
     if destination_locality == 'external':
       # transport
@@ -122,5 +125,14 @@ async def toggle_status(network_id: str, i: int, request: Request):
   status = not network['interfaces'][i]['active']
   network['interfaces'][i]['active'] = status
   network['messages'].insert(0, {'timestamp':datetime.utcnow().isoformat(), 'message': 'Interface {} is {}.'.format(i, 'UP' if status else 'DOWN') })
+  return {'success': True}
+
+
+@app.post('/{network_id}/interfaces/{i}/set_delay')
+async def set_delay(network_id: str, i: int, delay: int):
+  network = get_network(network_id)
+  print({'network_id': network_id, 'network': network, 'delay': delay})
+  network['interfaces'][i]['delay'] = delay
+  network['messages'].insert(0, {'timestamp':datetime.utcnow().isoformat(), 'message': 'Set delay of interface {} to {} ms.'.format(i, delay) })
   return {'success': True}
 
