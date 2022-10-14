@@ -22,6 +22,7 @@ class FlowRecord(BaseModel):
   destination_ip: str
   destination_port: int
   destination_locality: str
+  flow_end_reason: int = 3
 
   def toEcs(self):
     now = datetime.utcnow().isoformat()
@@ -55,13 +56,15 @@ class FlowRecord(BaseModel):
       'created': now,
       'kind': 'event',
       'type': 'connection',
-      'flow': {},
+      'flow': {
+        'locality': 'external' if self.source_locality == 'external' or self.destination_locality == 'external' else 'internal'
+      },
       'host': {'hostname': self.host_name, 'name': self.host_name},
       'input': {'type': 'netflow'},
       'netflow': {
         'ingress_interface': self.ingress_interface,
         'egress_interface': self.egress_interface,
-        'locality': self.source_locality == 'external' or self.destination_locality == 'external'
+        'flow_end_reason': self.flow_end_reason
       },
       'network': {
         'bytes': self.source_bytes + self.destination_bytes,

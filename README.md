@@ -9,3 +9,8 @@ uvicorn app.main:app --reload
 ```bash
 python3 -m app.client
 ```
+
+
+## References
+
+- [flowEndReason](https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-flow-end-reason)

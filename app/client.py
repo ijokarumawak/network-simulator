@@ -4,6 +4,7 @@ import random
 import ipaddress
 import yaml
 import requests
+import time
 from elasticsearch import AsyncElasticsearch
 from elasticsearch import ConnectionError
 from .config import settings
@@ -76,8 +77,16 @@ async def executeClient(client):
                             destination_ip=destination_ip, destination_port=443)
 
   print(request)
+  start = time.time()
   res = requests.post('http://localhost:8000/' + client['network_id'] + '/send/', json=request.dict())
+  end = time.time()
   print(res)
+  if res.status_code == 200:
+    # TODO: Convert to ECS and sotre it into Elasticsearch
+    result = res.json()
+    result['client'] = client
+    result['duration'] = end - start
+    print(result)
 
 
 
