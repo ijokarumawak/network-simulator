@@ -3,7 +3,6 @@ import socket
 import random
 import ipaddress
 import yaml
-import requests
 import time
 import httpx
 import math
@@ -60,7 +59,14 @@ for network in topology['networks']:
   } for i in range(network['num_of_clients'])])
 
 async def executeClient(client, http_client):
-  print(client)
+
+  wave_cycle = client['network']['client_wave_cycle']
+  if wave_cycle > 0:
+    # Generate wave form. w ranges from 0 to 100, if a random number exceeds w, do nothing.
+    w = (math.sin(math.radians((time.time() * (360 / wave_cycle)) % 360 )) + 1) * 50
+    if random.randrange(0, 100) > w:
+      return
+
   possible_targets = [client['network']['id']]
 
   if client['network']['gateway'] != 'internet':
@@ -70,7 +76,6 @@ async def executeClient(client, http_client):
     possible_targets.extend(client['network']['routings'])
 
 
-  print(client['network']['id'] + ' possible_targets = ' + str(possible_targets))
 
   target_network = random.randrange(-1, len(possible_targets))
   if target_network < 0:
@@ -90,12 +95,10 @@ async def executeClient(client, http_client):
   request = NetworkRequest(source_ip=source_ip, source_port=source_port,
                             destination_ip=destination_ip, destination_port=destination_port)
 
-  print(request)
   start = time.time()
   res = await http_client.post('http://localhost:8000/' + client['network']['id'] + '/send/', json=request.dict())
 
   end = time.time()
-  print(res)
   if res.status_code == 200:
     # Convert to ECS and sotre it into Elasticsearch
     result = res.json()
@@ -108,11 +111,9 @@ async def executeClient(client, http_client):
       'host': {'name': client['name'], 'hostname': client['name'], 'ip': source_ip}
     }
     ds.add_ds_fields(doc)
-    print(doc)
 
     try:
         res = await es.index(index=ds.name(), document=doc)
-        print(res)
     except (ConnectionError) as e:
         print('Elasticsearch data ingestion failed.')
         print(e)
@@ -121,7 +122,7 @@ async def executeClient(client, http_client):
 async def main():
   async with httpx.AsyncClient(timeout=None) as http_client:
     for client in clients:
-      task = asyncio.ensure_future(repeat(10, executeClient, client, http_client))
+      task = asyncio.ensure_future(repeat(client['network']['client_interval'], executeClient, client, http_client))
       tasks.append(task)
 
     await asyncio.gather(*tasks)

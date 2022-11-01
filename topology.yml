@@ -3,6 +3,8 @@ networks:
     network: '10.0.0.0/24'
     gateway: internet
     num_of_clients: 1
+    client_interval: 10
+    client_wave_cycle: 0
     num_of_interfaces: 4
   - id: B
     network: '172.16.0.0/24'
@@ -10,9 +12,13 @@ networks:
     routings:
       - C
     num_of_clients: 2
+    client_interval: 10
+    client_wave_cycle: 0
     num_of_interfaces: 2
   - id: C
     network: '192.168.0.0/24'
     gateway: B
-    num_of_clients: 2
+    num_of_clients: 50
+    client_interval: 1
+    client_wave_cycle: 60
     num_of_interfaces: 2
