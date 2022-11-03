@@ -15,7 +15,7 @@ from .model import NetworkRequest, FlowRecord
 from datetime import datetime
 
 
-ds = DataStream(type='logs', dataset='netflow.log')
+ds_netflow = DataStream(type='logs', dataset='netflow.log')
 
 with open('topology.yml', 'r') as file:
   topology = yaml.safe_load(file)
@@ -113,11 +113,10 @@ async def send(network_id: str, request: NetworkRequest):
     flow_end_reason= 3 if success else 4,
     event_start=start_timestamp, event_end=end_timestamp)
   doc = record.toEcs()
-  ds.add_ds_fields(doc)
+  ds_netflow.add_ds_fields(doc)
 
   try:
-      res = await es.index(index=ds.name(), document=doc)
-      print(res)
+      res = await es.index(index=ds_netflow.name(), document=doc)
   except (ConnectionError) as e:
       print('Elasticsearch data ingestion failed.')
       print(e)
@@ -130,7 +129,24 @@ async def toggle_status(network_id: str, i: int, request: Request):
   print({'network_id': network_id, 'network': network})
   status = not network['interfaces'][i]['active']
   network['interfaces'][i]['active'] = status
-  network['messages'].insert(0, {'timestamp':datetime.utcnow().isoformat(), 'message': 'Interface {} is {}.'.format(i, 'UP' if status else 'DOWN') })
+  log = {'timestamp':datetime.utcnow().isoformat(), 'message': 'Interface {} is {}.'.format(i, 'UP' if status else 'DOWN') }
+  network['messages'].insert(0, log)
+
+  # Send log to Elasticsearch
+  ds_applog = DataStream(type='logs', dataset='network_simulator.network', namespace=network_id.lower())
+  all = len(network['interfaces'])
+  up = len(list(filter(lambda x: (x['active']), network['interfaces'])))
+  doc = {'@timestamp': log['timestamp'], 'message': log['message'], 'NetworkSummary': {
+    'All': all,
+    'Up': up,
+    'Down': all - up}}
+  ds_applog.add_ds_fields(doc)
+  try:
+      res = await es.index(index=ds_applog.name(), document=doc)
+  except (ConnectionError) as e:
+      print('Elasticsearch data ingestion failed.')
+      print(e)
+
   return {'success': True}
 
 
@@ -139,6 +155,18 @@ async def set_delay(network_id: str, i: int, delay: int):
   network = get_network(network_id)
   print({'network_id': network_id, 'network': network, 'delay': delay})
   network['interfaces'][i]['delay'] = delay
-  network['messages'].insert(0, {'timestamp':datetime.utcnow().isoformat(), 'message': 'Set delay of interface {} to {} ms.'.format(i, delay) })
+  log = {'timestamp':datetime.utcnow().isoformat(), 'message': 'Set delay of interface {} to {} ms.'.format(i, delay) }
+  network['messages'].insert(0, log)
+
+  # Send log to Elasticsearch
+  ds_applog = DataStream(type='logs', dataset='network_simulator.network', namespace=network_id.lower())
+  doc = {'@timestamp': log['timestamp'], 'message': log['message']}
+  ds_applog.add_ds_fields(doc)
+  try:
+      res = await es.index(index=ds_applog.name(), document=doc)
+  except (ConnectionError) as e:
+      print('Elasticsearch data ingestion failed.')
+      print(e)
+
   return {'success': True}
 

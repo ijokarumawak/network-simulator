@@ -1,0 +1,136 @@
+# Creaet a reusable script to add minutes.
+PUT _scripts/addMinutes
+{
+  "script": {
+    "lang": "painless",
+"source": """
+def parent = ctx;
+def value = null;
+def f = null;
+def path = params['field'].splitOnToken('.');
+for (int i = 0; i < path.length; i++) {
+  f = path[i];
+  value = parent[f];
+  if (value == null) {
+    return;
+  }
+  if (i < path.length -1) {
+    parent = value;
+  }
+}
+if (params['postfix'] != null) {
+  value += params['postfix'];
+}
+def timestamp = ZonedDateTime.parse(value);
+parent[f] = timestamp.plusMinutes(params['m']);
+ctx['_id'] = null;
+"""
+  }
+}
+
+# Create a pipeline to add 15 minutes of target fields.
+PUT _ingest/pipeline/add15Minutes
+{
+  "processors": [
+    {
+      "script": {
+        "id": "addMinutes",
+        "params": {
+          "field": "@timestamp",
+          "m": 15,
+          "postfix": "Z"
+        }
+      }
+    },
+    {
+      "script": {
+        "id": "addMinutes",
+        "params": {
+          "field": "created",
+          "m": 15,
+          "postfix": "Z"
+        }
+      }
+    },
+    {
+      "script": {
+        "id": "addMinutes",
+        "params": {
+          "field": "event.ingested",
+          "m": 15
+        }
+      }
+    },
+    {
+      "script": {
+        "id": "addMinutes",
+        "params": {
+          "field": "event.start",
+          "m": 15,
+          "postfix": "Z"
+        }
+      }
+    },
+    {
+      "script": {
+        "id": "addMinutes",
+        "params": {
+          "field": "event.end",
+          "m": 15,
+          "postfix": "Z"
+        }
+      }
+    }
+  ]
+}
+
+# Delete partially ingested documents.
+POST logs-netflow.log-test/_delete_by_query
+{
+  "query": {
+    "range": {
+      "@timestamp": {
+        "gte": "2022-11-03T11:15:00+09:00"
+      }
+    }
+  }
+}
+
+# Copy existing docs while adding 15 mins.
+POST _reindex
+{
+  "source": {
+"index": "logs-netflow.log-test",     
+  "query": {
+    "range": {
+      "@timestamp": {
+        "gte": "2022-11-03T11:00:00+09:00",
+        "lt": "2022-11-03T11:15:00+09:00"
+      }
+    }
+  }
+  },
+  "dest": {
+    "index": "logs-netflow.log-15min",
+    "op_type": "create",
+    "pipeline": "add15Minutes"
+  }
+}
+
+# Copy 15 min behind documents back into the original data stream.
+POST _reindex
+{
+  "source": {
+    "index": "logs-netflow.log-15min"
+  },
+  "dest": {
+    "index": "logs-netflow.log-test",
+    "op_type": "create"
+  }
+}
+
+# Delete the temp data stream.
+DELETE _data_stream/logs-netflow.log-15min
+
+# Change the time range and repeat the last 3 steps.
+# The 'postfix' param is only needed for the 1st time.

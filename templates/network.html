@@ -3,59 +3,62 @@
     <title>{{ network.id }}</title>
     <link href="{{ url_for('static', path='/styles.css') }}" rel="stylesheet">
 </head>
-<body>
-    <h1>Network {{ network.id }}</h1>
+<body style="background-color: {{ network.background_color }};">
+    <div id="network-id" style="color: {{ network.color }};">{{ network.id }}</div>
+    <main>
+      <h1 style="color: {{ network.color }};">Network {{ network.id }}</h1>
 
-    <h2>Messages</h2>
-    <section id="messages">
-      <table>
-        <thead>
-          <th>timestamp</th>
-          <th>message</th>
-        </thead>
-        <tbody>
-          {% for message in network.messages %}
-          <tr><td>{{ message.timestamp }}</td><td>{{ message.message }}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </section>
+      <h2>Messages</h2>
+      <section id="messages">
+        <table>
+          <thead>
+            <th>timestamp</th>
+            <th>message</th>
+          </thead>
+          <tbody>
+            {% for message in network.messages %}
+            <tr><td>{{ message.timestamp }}</td><td>{{ message.message }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
 
-    <h2>Interfaces</h2>
-    <div class="container">
-      {% for interface in network.interfaces %}
-      <div class="interface">
-        <div class="container space-between">
-          <h3>{{ interface.i }}</h3>
-          <div class="status" onclick="toggleInterfaceStatus('{{ network.id }}', {{ interface.i }})">
-            {% if interface.active %}
-            <button class="up">UP</button>
-            {% else %}
-            <button class="down">DOWN</button>
-            {% endif %}
-          </div>
-        </div>
-        <div class="detail">
+      <h2>Interfaces</h2>
+      <div class="container">
+        {% for interface in network.interfaces %}
+        <div class="interface">
           <div class="container space-between">
-            <label>in</label>
-            <div><span>{{ interface.bytes_in }}</span><span class="unit">bytes</span></div>
+            <h3>{{ interface.i }}</h3>
+            <div class="status" onclick="toggleInterfaceStatus('{{ network.id }}', {{ interface.i }})">
+              {% if interface.active %}
+              <button class="up">UP</button>
+              {% else %}
+              <button class="down">DOWN</button>
+              {% endif %}
+            </div>
           </div>
-          <div class="container space-between">
-            <label>out</label>
-            <div><span>{{ interface.bytes_out }}</span><span class="unit">bytes</span></div>
-          </div>
-          <div class="container space-between">
-            <label for="delay-{{ interface.i }}">delay</label>
-            <div>
-              <input id="delay-{{ interface.i }}" class="delay" onkeypress="setInterfaceDelay(event)"
-                     type="number" value="{{ interface.delay }}" min="0" step="100" x-network="{{ network.id }}" x-interface="{{ interface.i }}" />
-              <span class="unit">ms</span>
+          <div class="detail">
+            <div class="container space-between">
+              <label>in</label>
+              <div><span>{{ interface.bytes_in }}</span><span class="unit">bytes</span></div>
+            </div>
+            <div class="container space-between">
+              <label>out</label>
+              <div><span>{{ interface.bytes_out }}</span><span class="unit">bytes</span></div>
+            </div>
+            <div class="container space-between">
+              <label for="delay-{{ interface.i }}">delay</label>
+              <div>
+                <input id="delay-{{ interface.i }}" class="delay" onkeypress="setInterfaceDelay(event)"
+                      type="number" value="{{ interface.delay }}" min="0" step="100" x-network="{{ network.id }}" x-interface="{{ interface.i }}" />
+                <span class="unit">ms</span>
+              </div>
             </div>
           </div>
         </div>
+      {% endfor %}
       </div>
-    {% endfor %}
-    </div>
-    <script src="{{ url_for('static', path='/ui.js') }}"></script>
+      <script src="{{ url_for('static', path='/ui.js') }}"></script>
+    </main>
   </body>
 </html>

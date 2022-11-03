@@ -1,5 +1,7 @@
 networks:
   - id: A
+    color: indianred
+    background_color: oldlace
     network: '10.0.0.0/24'
     gateway: internet
     num_of_clients: 1
@@ -7,6 +9,8 @@ networks:
     client_wave_cycle: 0
     num_of_interfaces: 4
   - id: B
+    color: dodgerblue
+    background_color: mintcream
     network: '172.16.0.0/24'
     gateway: A
     routings:
@@ -16,6 +20,8 @@ networks:
     client_wave_cycle: 0
     num_of_interfaces: 2
   - id: C
+    color: forestgreen
+    background_color: ivory
     network: '192.168.0.0/24'
     gateway: B
     num_of_clients: 50
